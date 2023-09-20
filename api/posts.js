@@ -8,6 +8,8 @@ const {
   getAllPosts,
   updatePost,
   getPostById,
+  deletePost,
+  getPostsByUser,
 } = require('../db');
 
 postsRouter.get('/', async (req, res, next) => {
@@ -38,7 +40,7 @@ postsRouter.get('/', async (req, res, next) => {
 });
 
 postsRouter.post('/', requireUser, async (req, res, next) => {
-  const { title, content = "" } = req.body;
+  const { title,  tags , content = "" } = req.body;
 
   const postData = {};
 
@@ -46,6 +48,10 @@ postsRouter.post('/', requireUser, async (req, res, next) => {
     postData.authorId = req.user.id;
     postData.title = title;
     postData.content = content;
+    if (tags && tags.length > 0) {
+      postData.tags = tags.trim().split(/\s+/);
+    }
+    
 
     const post = await createPost(postData);
 
@@ -98,7 +104,30 @@ postsRouter.patch('/:postId', requireUser, async (req, res, next) => {
 });
 
 postsRouter.delete('/:postId', requireUser, async (req, res, next) => {
-  res.send({ message: 'under construction' });
-});
+  try {
+  const {postId} = req.params;
+    const postToUpdate = await getPostById(postId);
+   
+    if(!postToUpdate) {
+      next({
+        name: 'NotFound',
+        message: `No post by ID ${postId}`
+      })
+    } else if(req.user.id !== postToUpdate.author.id) {
+      res.status(403);
+      next({
+        name: "WrongUserError",
+        message: "You must be the same user who created this post to perform this action"
+      });
+    } else {
+      const deleteThePost = await deletePost(postId)
+      res.send({success: true, ...deleteThePost});
+    }
+  } catch (error) {
+    next(error);
+  }
+  })
+
+  
 
 module.exports = postsRouter;
